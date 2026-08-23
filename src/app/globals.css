@@ -692,3 +692,16 @@ tbody tr:last-child td {
     justify-content: flex-start;
   }
 }
+
+.table-heading {
+  align-items: center;
+  display: flex;
+  font-size: 0.95rem;
+  font-weight: 700;
+  gap: 8px;
+  margin: 26px 0 0;
+}
+
+.table-heading + .table-shell {
+  margin-top: 10px;
+}
