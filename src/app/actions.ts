@@ -4,6 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { composeDateTimeInput, parseDateInput } from "@/lib/dates";
+import {
+  assertDepartmentBelongsToHotel,
+  assertEmployeeBelongsToHotel,
+  assertRoleBelongsToHotel,
+  assertShiftBelongsToHotel,
+} from "@/lib/guards";
 import { prisma } from "@/lib/db";
 import { createSession, destroySession } from "@/lib/auth";
 import { verifyPassword } from "@/lib/password";
@@ -45,78 +51,6 @@ function invalidLoginRedirect(next: string | null | undefined) {
   }
 
   return `/login?${params.toString()}`;
-}
-
-async function assertDepartmentBelongsToHotel(hotelId: string, departmentId: string | null) {
-  if (!departmentId) {
-    return;
-  }
-
-  const department = await prisma.department.findFirst({
-    where: {
-      id: departmentId,
-      hotelId,
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  if (!department) {
-    throw new Error("Selected department does not belong to the active hotel.");
-  }
-}
-
-async function assertRoleBelongsToHotel(hotelId: string, roleId: string | null) {
-  if (!roleId) {
-    return;
-  }
-
-  const role = await prisma.role.findFirst({
-    where: {
-      id: roleId,
-      hotelId,
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  if (!role) {
-    throw new Error("Selected role does not belong to the active hotel.");
-  }
-}
-
-async function assertEmployeeBelongsToHotel(hotelId: string, employeeId: string) {
-  const employee = await prisma.employee.findFirst({
-    where: {
-      id: employeeId,
-      hotelId,
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  if (!employee) {
-    throw new Error("Selected employee does not belong to the active hotel.");
-  }
-}
-
-async function assertShiftBelongsToHotel(hotelId: string, shiftId: string) {
-  const shift = await prisma.shift.findFirst({
-    where: {
-      id: shiftId,
-      hotelId,
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  if (!shift) {
-    throw new Error("Selected shift does not belong to the active hotel.");
-  }
 }
 
 export async function login(formData: FormData) {

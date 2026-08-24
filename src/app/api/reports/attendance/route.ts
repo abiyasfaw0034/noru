@@ -1,18 +1,19 @@
 import { NextResponse } from "next/server";
 
+import { parseDaysParam, requireApiHotel } from "@/lib/api";
 import { getAttendanceReport } from "@/lib/reports";
-import { getHotelContext } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const { activeHotel } = await getHotelContext();
+export async function GET(request: Request) {
+  const auth = await requireApiHotel();
 
-  if (!activeHotel) {
-    return NextResponse.json({ error: "Authentication required or no hotel access." }, { status: 401 });
+  if (!auth.ok) {
+    return auth.response;
   }
 
-  const report = await getAttendanceReport(activeHotel.id, 30);
+  const days = parseDaysParam(new URL(request.url).searchParams.get("days"), 30, 365);
+  const report = await getAttendanceReport(auth.hotelId, days);
 
-  return NextResponse.json({ report });
+  return NextResponse.json({ days, count: report.length, report });
 }

@@ -86,3 +86,6 @@ export const attendanceFormSchema = z.object({
 export function formEntries(formData: FormData) {
   return Object.fromEntries(formData.entries());
 }
+
+/** PATCH accepts any subset of the create fields. */
+export const employeeUpdateSchema = employeeFormSchema.partial();

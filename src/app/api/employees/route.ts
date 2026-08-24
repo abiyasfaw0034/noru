@@ -1,23 +1,28 @@
 import { NextResponse } from "next/server";
 
+import { requireApiHotel, toErrorResponse } from "@/lib/api";
 import { parseDateInput } from "@/lib/dates";
 import { prisma } from "@/lib/db";
-import { getHotelContext } from "@/lib/tenant";
+import { buildEmployeeWhere, parseEmployeeFilters } from "@/lib/employee-filters";
+import { assertDepartmentBelongsToHotel, assertRoleBelongsToHotel } from "@/lib/guards";
 import { employeeFormSchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const { activeHotel } = await getHotelContext();
+export async function GET(request: Request) {
+  const auth = await requireApiHotel();
 
-  if (!activeHotel) {
-    return NextResponse.json({ error: "Authentication required or no hotel access." }, { status: 401 });
+  if (!auth.ok) {
+    return auth.response;
   }
 
+  const { hotelId } = auth;
+
+  const params = Object.fromEntries(new URL(request.url).searchParams.entries());
+  const filters = parseEmployeeFilters(params);
+
   const employees = await prisma.employee.findMany({
-    where: {
-      hotelId: activeHotel.id,
-    },
+    where: buildEmployeeWhere(hotelId, filters),
     include: {
       department: true,
       role: true,
@@ -25,17 +30,26 @@ export async function GET() {
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
   });
 
-  return NextResponse.json({ employees });
+  return NextResponse.json({ count: employees.length, filters, employees });
 }
 
 export async function POST(request: Request) {
-  const { activeHotel } = await getHotelContext();
+  const auth = await requireApiHotel();
 
-  if (!activeHotel) {
-    return NextResponse.json({ error: "Authentication required or no hotel access." }, { status: 401 });
+  if (!auth.ok) {
+    return auth.response;
   }
 
-  const payload = await request.json();
+  const { hotelId } = auth;
+
+  let payload: unknown;
+
+  try {
+    payload = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
+  }
+
   const parsed = employeeFormSchema.safeParse(payload);
 
   if (!parsed.success) {
@@ -43,20 +57,38 @@ export async function POST(request: Request) {
   }
 
   const data = parsed.data;
-  const employee = await prisma.employee.create({
-    data: {
-      hotelId: activeHotel.id,
-      employeeCode: data.employeeCode,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      email: data.email,
-      phone: data.phone,
-      status: data.status,
-      hireDate: parseDateInput(data.hireDate),
-      departmentId: data.departmentId,
-      roleId: data.roleId,
-    },
-  });
+  const departmentId = data.departmentId ?? null;
+  const roleId = data.roleId ?? null;
 
-  return NextResponse.json({ employee }, { status: 201 });
+  try {
+    // The client supplies these ids, so they are verified against the active
+    // hotel before use — the same guard the server actions run.
+    await Promise.all([
+      assertDepartmentBelongsToHotel(hotelId, departmentId),
+      assertRoleBelongsToHotel(hotelId, roleId),
+    ]);
+
+    const employee = await prisma.employee.create({
+      data: {
+        hotelId,
+        employeeCode: data.employeeCode,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phone: data.phone ?? null,
+        status: data.status,
+        hireDate: parseDateInput(data.hireDate),
+        departmentId,
+        roleId,
+      },
+      include: {
+        department: true,
+        role: true,
+      },
+    });
+
+    return NextResponse.json({ employee }, { status: 201 });
+  } catch (error) {
+    return toErrorResponse(error);
+  }
 }

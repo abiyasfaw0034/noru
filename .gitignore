@@ -7,7 +7,7 @@ dist
 *.db-journal
 *.log
 *.tsbuildinfo
-coverage
+/coverage
 .vercel
 AGENTS.md
 CLAUDE.md
