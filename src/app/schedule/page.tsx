@@ -1,6 +1,11 @@
-import { CalendarPlus, Link2, UsersRound } from "lucide-react";
+import { CalendarPlus, Link2, Trash2, UsersRound } from "lucide-react";
 
-import { assignShift, createShift } from "@/app/actions";
+import {
+  assignShift,
+  createShift,
+  deleteShift,
+  deleteShiftAssignment,
+} from "@/app/actions";
 import { NoHotelState } from "@/components/NoHotelState";
 import { StatusPill } from "@/components/StatusPill";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -42,6 +47,11 @@ export default async function SchedulePage() {
       },
       include: {
         department: true,
+        _count: {
+          select: {
+            shiftAssignments: true,
+          },
+        },
       },
       orderBy: [{ startTime: "asc" }, { name: "asc" }],
     }),
@@ -170,6 +180,55 @@ export default async function SchedulePage() {
         </article>
       </section>
 
+      <h2 className="table-heading">Shift templates</h2>
+      <section className="table-shell">
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Shift</th>
+                <th>Department</th>
+                <th>Required staff</th>
+                <th>Assignments</th>
+                <th aria-label="Actions" />
+              </tr>
+            </thead>
+            <tbody>
+              {shifts.length === 0 ? (
+                <tr>
+                  <td colSpan={5}>No shift templates yet. Create one above.</td>
+                </tr>
+              ) : (
+                shifts.map((shift) => (
+                  <tr key={shift.id}>
+                    <td>
+                      <div className="cell-title">
+                        <strong>{shift.name}</strong>
+                        <span>
+                          {shift.startTime} - {shift.endTime}
+                        </span>
+                      </div>
+                    </td>
+                    <td>{shift.department?.name ?? "No department"}</td>
+                    <td>{shift.requiredStaff}</td>
+                    <td>{shift._count.shiftAssignments}</td>
+                    <td>
+                      <form action={deleteShift.bind(null, shift.id)} className="row-actions">
+                        <button className="button danger" type="submit">
+                          <Trash2 aria-hidden size={16} />
+                          Delete
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <h2 className="table-heading">Recent assignments</h2>
       <section className="table-shell">
         <div className="table-scroll">
           <table>
@@ -180,6 +239,7 @@ export default async function SchedulePage() {
                 <th>Employee</th>
                 <th>Department</th>
                 <th>Status</th>
+                <th aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
@@ -200,6 +260,17 @@ export default async function SchedulePage() {
                   <td>{assignment.shift.department?.name ?? "No department"}</td>
                   <td>
                     <StatusPill status={assignment.status} />
+                  </td>
+                  <td>
+                    <form
+                      action={deleteShiftAssignment.bind(null, assignment.id)}
+                      className="row-actions"
+                    >
+                      <button className="button danger" type="submit">
+                        <Trash2 aria-hidden size={16} />
+                        Remove
+                      </button>
+                    </form>
                   </td>
                 </tr>
               ))}

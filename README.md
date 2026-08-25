@@ -23,9 +23,11 @@ This is the best fit for Neon at this stage: it avoids the operational overhead 
 - Login/logout with signed JWT cookie sessions
 - Dedicated department and role management screens
 - Employee CRUD
+- Employee search and filtering by name, code, email, department, role, and status
 - Department and role assignment
-- Shift creation and employee shift assignment
-- Attendance recording
+- Shift template creation, listing, and deletion
+- Employee shift assignment and unassignment
+- Attendance recording and correction
 - Dashboard metrics
 - Attendance and shift coverage reports
 - JSON APIs for employees and attendance report data
@@ -94,8 +96,17 @@ npm run db:studio    # Open Prisma Studio
 
 ## API
 
-- `GET /api/employees`
-- `POST /api/employees`
-- `GET /api/reports/attendance`
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/api/employees` | Accepts the same `q`, `departmentId`, `roleId`, and `status` filters as the UI |
+| POST | `/api/employees` | 201 on success, 409 on duplicate code/email, 422 on a cross-tenant department or role |
+| GET | `/api/employees/{id}` | Includes the 10 most recent shift assignments and attendance records |
+| PATCH | `/api/employees/{id}` | Partial update; any subset of the create fields |
+| DELETE | `/api/employees/{id}` | |
+| GET | `/api/reports/attendance` | `?days=` window, defaults to 30, capped at 365 |
+| GET | `/api/reports/coverage` | `?days=` window, defaults to 7, capped at 30; returns shortfall totals |
+
+Every route resolves the caller's active hotel first and scopes its query to it, so an id
+belonging to another tenant returns 404 rather than leaking that the record exists.
 
 The UI is the primary interface, but the APIs are included to show the system can expose data programmatically.

@@ -1,6 +1,6 @@
-import { ClipboardCheck } from "lucide-react";
+import { ClipboardCheck, Trash2 } from "lucide-react";
 
-import { recordAttendance } from "@/app/actions";
+import { deleteAttendance, recordAttendance } from "@/app/actions";
 import { NoHotelState } from "@/components/NoHotelState";
 import { StatusPill } from "@/components/StatusPill";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -122,6 +122,7 @@ export default async function AttendancePage() {
                 <th>Clock out</th>
                 <th>Status</th>
                 <th>Notes</th>
+                <th aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
@@ -138,6 +139,14 @@ export default async function AttendancePage() {
                     <StatusPill status={record.status} />
                   </td>
                   <td>{record.notes ?? "-"}</td>
+                  <td>
+                    <form action={deleteAttendance.bind(null, record.id)} className="row-actions">
+                      <button className="button danger" type="submit">
+                        <Trash2 aria-hidden size={16} />
+                        Delete
+                      </button>
+                    </form>
+                  </td>
                 </tr>
               ))}
             </tbody>

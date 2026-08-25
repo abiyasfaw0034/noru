@@ -406,3 +406,50 @@ export async function recordAttendance(formData: FormData) {
   revalidatePath("/attendance");
   revalidatePath("/reports");
 }
+
+export async function deleteShift(id: string) {
+  const hotelId = await requireActiveHotelId();
+
+  // Assignments cascade with the shift, so removing a template also clears the
+  // dated rows that referenced it.
+  await prisma.shift.deleteMany({
+    where: {
+      id,
+      hotelId,
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/schedule");
+  revalidatePath("/reports");
+}
+
+export async function deleteShiftAssignment(id: string) {
+  const hotelId = await requireActiveHotelId();
+
+  await prisma.shiftAssignment.deleteMany({
+    where: {
+      id,
+      hotelId,
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/schedule");
+  revalidatePath("/reports");
+}
+
+export async function deleteAttendance(id: string) {
+  const hotelId = await requireActiveHotelId();
+
+  await prisma.attendance.deleteMany({
+    where: {
+      id,
+      hotelId,
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/attendance");
+  revalidatePath("/reports");
+}
