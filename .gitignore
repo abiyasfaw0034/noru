@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+dist
+.env
+*.db
+*.db-journal
+*.log
+*.tsbuildinfo
+coverage
+.vercel
+AGENTS.md
+CLAUDE.md

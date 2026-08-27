@@ -1,0 +1,210 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum HotelStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum SystemRole {
+  SUPER_ADMIN
+  HOTEL_USER
+}
+
+enum HotelMemberRole {
+  OWNER
+  MANAGER
+  STAFF
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  ON_LEAVE
+  INACTIVE
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  ON_LEAVE
+}
+
+enum ShiftAssignmentStatus {
+  SCHEDULED
+  COMPLETED
+  MISSED
+  CANCELLED
+}
+
+model Hotel {
+  id               String            @id @default(cuid())
+  slug             String            @unique
+  name             String
+  address          String?
+  phone            String?
+  email            String?
+  timezone         String            @default("Africa/Nairobi")
+  status           HotelStatus       @default(ACTIVE)
+  departments      Department[]
+  roles            Role[]
+  employees        Employee[]
+  shifts           Shift[]
+  shiftAssignments ShiftAssignment[]
+  attendance       Attendance[]
+  memberships      HotelMembership[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([status])
+}
+
+model User {
+  id           String            @id @default(cuid())
+  name         String
+  email        String            @unique
+  passwordHash String
+  systemRole   SystemRole        @default(HOTEL_USER)
+  isActive     Boolean           @default(true)
+  lastLoginAt  DateTime?
+  memberships  HotelMembership[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([systemRole])
+  @@index([isActive])
+}
+
+model HotelMembership {
+  id        String          @id @default(cuid())
+  userId    String
+  hotelId   String
+  role      HotelMemberRole @default(STAFF)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hotel     Hotel           @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@unique([userId, hotelId])
+  @@index([hotelId])
+}
+
+model Department {
+  id          String     @id @default(cuid())
+  hotelId     String
+  name        String
+  description String?
+  hotel       Hotel      @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  employees   Employee[]
+  shifts      Shift[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([hotelId, name])
+  @@index([hotelId])
+}
+
+model Role {
+  id          String     @id @default(cuid())
+  hotelId     String
+  name        String
+  description String?
+  hotel       Hotel      @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  employees   Employee[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([hotelId, name])
+  @@index([hotelId])
+}
+
+model Employee {
+  id               String            @id @default(cuid())
+  hotelId          String
+  employeeCode     String
+  firstName        String
+  lastName         String
+  email            String
+  phone            String?
+  status           EmployeeStatus    @default(ACTIVE)
+  hireDate         DateTime
+  departmentId     String?
+  roleId           String?
+  hotel            Hotel             @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  department       Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  role             Role?             @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  shiftAssignments ShiftAssignment[]
+  attendance       Attendance[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@unique([hotelId, employeeCode])
+  @@unique([hotelId, email])
+  @@index([hotelId])
+  @@index([departmentId])
+  @@index([roleId])
+  @@index([status])
+}
+
+model Shift {
+  id               String            @id @default(cuid())
+  hotelId          String
+  name             String
+  startTime        String
+  endTime          String
+  requiredStaff    Int               @default(1)
+  departmentId     String?
+  hotel            Hotel             @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  department       Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  shiftAssignments ShiftAssignment[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([hotelId])
+  @@index([departmentId])
+}
+
+model ShiftAssignment {
+  id         String                @id @default(cuid())
+  hotelId    String
+  employeeId String
+  shiftId    String
+  date       DateTime
+  status     ShiftAssignmentStatus @default(SCHEDULED)
+  hotel      Hotel                 @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  employee   Employee              @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  shift      Shift                 @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+
+  @@unique([hotelId, employeeId, shiftId, date])
+  @@index([hotelId])
+  @@index([date])
+  @@index([shiftId])
+}
+
+model Attendance {
+  id         String           @id @default(cuid())
+  hotelId    String
+  employeeId String
+  date       DateTime
+  clockIn    DateTime?
+  clockOut   DateTime?
+  status     AttendanceStatus
+  notes      String?
+  hotel      Hotel            @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  employee   Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@unique([hotelId, employeeId, date])
+  @@index([hotelId])
+  @@index([date])
+  @@index([status])
+}
