@@ -238,8 +238,27 @@ export async function createDepartment(formData: FormData) {
   });
 
   revalidatePath("/hotels");
+  revalidatePath("/departments");
   revalidatePath("/employees");
   revalidatePath("/schedule");
+}
+
+export async function deleteDepartment(id: string) {
+  const hotelId = await requireActiveHotelId();
+
+  await prisma.department.deleteMany({
+    where: {
+      id,
+      hotelId,
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/hotels");
+  revalidatePath("/departments");
+  revalidatePath("/employees");
+  revalidatePath("/schedule");
+  revalidatePath("/reports");
 }
 
 export async function createRole(formData: FormData) {
@@ -255,7 +274,25 @@ export async function createRole(formData: FormData) {
   });
 
   revalidatePath("/hotels");
+  revalidatePath("/roles");
   revalidatePath("/employees");
+}
+
+export async function deleteRole(id: string) {
+  const hotelId = await requireActiveHotelId();
+
+  await prisma.role.deleteMany({
+    where: {
+      id,
+      hotelId,
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/hotels");
+  revalidatePath("/roles");
+  revalidatePath("/employees");
+  revalidatePath("/reports");
 }
 
 export async function createEmployee(formData: FormData) {

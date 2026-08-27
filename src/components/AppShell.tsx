@@ -3,9 +3,11 @@ import {
   Building2,
   CalendarClock,
   ClipboardCheck,
+  Briefcase,
   LogOut,
   Hotel,
   LayoutDashboard,
+  Network,
   UsersRound,
 } from "lucide-react";
 import Link from "next/link";
@@ -28,6 +30,16 @@ const navItems = [
     href: "/employees",
     label: "Employees",
     icon: UsersRound,
+  },
+  {
+    href: "/departments",
+    label: "Departments",
+    icon: Network,
+  },
+  {
+    href: "/roles",
+    label: "Roles",
+    icon: Briefcase,
   },
   {
     href: "/schedule",

@@ -21,6 +21,7 @@ This is the best fit for Neon at this stage: it avoids the operational overhead 
 
 - Super-admin hotel tenant list and active hotel switcher
 - Login/logout with signed JWT cookie sessions
+- Dedicated department and role management screens
 - Employee CRUD
 - Department and role assignment
 - Shift creation and employee shift assignment
