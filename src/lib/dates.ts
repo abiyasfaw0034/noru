@@ -61,3 +61,8 @@ export function toDateInputValue(date: Date | string) {
 export function todayInputValue() {
   return toDateInputValue(todayUtc());
 }
+
+/** `YYYY-MM-DD` for a UTC-normalised date, for use as a SQL `date` parameter. */
+export function toDateOnly(date: Date) {
+  return date.toISOString().slice(0, 10);
+}

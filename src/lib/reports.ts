@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { addDaysUtc, todayUtc } from "@/lib/dates";
+import { addDaysUtc, toDateOnly, todayUtc } from "@/lib/dates";
 
 export async function getAttendanceReport(hotelId: string, days = 30) {
   const from = addDaysUtc(todayUtc(), -days + 1);
@@ -79,82 +79,89 @@ export async function getAttendanceReport(hotelId: string, days = 30) {
   });
 }
 
+type CoverageRow = {
+  day: Date;
+  shiftId: string;
+  shiftName: string;
+  startTime: string;
+  endTime: string;
+  requiredStaff: number;
+  departmentName: string | null;
+  assigned: number;
+  gap: number;
+  people: string[];
+};
+
+/**
+ * Shift coverage for a rolling window, answered in one query.
+ *
+ * The hard part is that a gap is the absence of rows: a shift with nobody on it
+ * has no assignment records to read, so it cannot be found by querying
+ * assignments. The date spine from generate_series is CROSS JOINed against the
+ * hotel's shifts to build every day/shift slot that *should* exist, and the
+ * LATERAL subquery counts whoever was actually assigned to each one. Slots with
+ * no match survive as assigned = 0, which is exactly the row an operations lead
+ * needs to see.
+ *
+ * Previously this ran three Prisma queries and joined them in JavaScript, which
+ * meant materialising every assignment in the window and scanning that list once
+ * per day/shift pair.
+ */
 export async function getShiftCoverageReport(hotelId: string, days = 7) {
   const start = todayUtc();
-  const end = addDaysUtc(start, days);
+  const end = addDaysUtc(start, days - 1);
+  const startDate = toDateOnly(start);
+  const endDate = toDateOnly(end);
 
-  const [shifts, groupedAssignments, assignments] = await Promise.all([
-    prisma.shift.findMany({
-      where: {
-        hotelId,
-      },
-      include: {
-        department: true,
-      },
-      orderBy: [{ startTime: "asc" }, { name: "asc" }],
-    }),
-    prisma.shiftAssignment.groupBy({
-      by: ["shiftId", "date"],
-      where: {
-        hotelId,
-        date: {
-          gte: start,
-          lt: end,
-        },
-        status: {
-          not: "CANCELLED",
-        },
-      },
-      _count: {
-        _all: true,
-      },
-    }),
-    prisma.shiftAssignment.findMany({
-      where: {
-        hotelId,
-        date: {
-          gte: start,
-          lt: end,
-        },
-        status: {
-          not: "CANCELLED",
-        },
-      },
-      include: {
-        employee: true,
-      },
-      orderBy: {
-        date: "asc",
-      },
-    }),
-  ]);
+  const rows = await prisma.$queryRaw<CoverageRow[]>`
+    WITH spine AS (
+      SELECT generate_series(${startDate}::date, ${endDate}::date, '1 day')::date AS day
+    )
+    SELECT
+      spine.day                                                    AS "day",
+      s.id                                                         AS "shiftId",
+      s.name                                                       AS "shiftName",
+      s."startTime"                                                AS "startTime",
+      s."endTime"                                                  AS "endTime",
+      s."requiredStaff"                                            AS "requiredStaff",
+      d.name                                                       AS "departmentName",
+      COALESCE(cover.assigned, 0)::int                             AS "assigned",
+      GREATEST(s."requiredStaff" - COALESCE(cover.assigned, 0), 0)::int AS "gap",
+      COALESCE(cover.people, ARRAY[]::text[])                      AS "people"
+    FROM spine
+    CROSS JOIN "Shift" s
+    LEFT JOIN "Department" d ON d.id = s."departmentId"
+    LEFT JOIN LATERAL (
+      SELECT
+        COUNT(*)::int AS assigned,
+        ARRAY_AGG(e."firstName" || ' ' || e."lastName" ORDER BY e."lastName", e."firstName") AS people
+      FROM "ShiftAssignment" sa
+      JOIN "Employee" e ON e.id = sa."employeeId"
+      WHERE sa."shiftId" = s.id
+        AND sa."hotelId" = s."hotelId"
+        AND sa."date" = spine.day
+        AND sa.status <> 'CANCELLED'
+    ) cover ON TRUE
+    WHERE s."hotelId" = ${hotelId}
+    ORDER BY spine.day ASC, s."startTime" ASC, s.name ASC
+  `;
 
-  const windows = Array.from({ length: days }, (_, index) => addDaysUtc(start, index));
-
-  return windows.flatMap((date) =>
-    shifts.map((shift) => {
-      const grouped = groupedAssignments.find(
-        (assignment) =>
-          assignment.shiftId === shift.id && assignment.date.toISOString() === date.toISOString(),
-      );
-      const people = assignments
-        .filter(
-          (assignment) =>
-            assignment.shiftId === shift.id && assignment.date.toISOString() === date.toISOString(),
-        )
-        .map((assignment) => `${assignment.employee.firstName} ${assignment.employee.lastName}`);
-      const assigned = grouped?._count._all ?? 0;
-
-      return {
-        date,
-        shift,
-        assigned,
-        required: shift.requiredStaff,
-        gap: Math.max(shift.requiredStaff - assigned, 0),
-        people,
-      };
-    }),
-  );
+  // Kept in the shape the page and API already consume.
+  return rows.map((row) => ({
+    date: new Date(row.day),
+    shift: {
+      id: row.shiftId,
+      name: row.shiftName,
+      startTime: row.startTime,
+      endTime: row.endTime,
+      requiredStaff: row.requiredStaff,
+      department: row.departmentName ? { name: row.departmentName } : null,
+    },
+    assigned: row.assigned,
+    required: row.requiredStaff,
+    gap: row.gap,
+    people: row.people,
+  }));
 }
 
 export async function getDashboardStats(hotelId: string) {

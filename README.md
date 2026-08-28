@@ -53,6 +53,25 @@ Important relationships:
 - Shift assignments and attendance are unique per hotel and employee/date context.
 - Reports always filter by the active hotel.
 
+## Reports
+
+Two reports back the `/reports` screen.
+
+**Shift coverage** is the non-trivial one. A staffing gap is the *absence* of rows:
+a shift with nobody on it has no assignment records, so it cannot be found by
+querying assignments. The query builds the day/shift slots that should exist —
+`generate_series` for the date spine, CROSS JOINed against the hotel's shifts —
+then uses a LATERAL subquery to count who was actually assigned to each slot and
+aggregate their names. Uncovered slots survive as `assigned = 0`, which is the
+row an operations lead actually needs. It runs as one statement in
+`getShiftCoverageReport`.
+
+**Attendance summary** uses Prisma's `groupBy` over employee and status for the
+last N days, and derives worked hours from the clock-in/clock-out deltas. The
+attendance rate is `(PRESENT + LATE) / (PRESENT + LATE + ABSENT)`; ON_LEAVE is
+deliberately left out of the denominator so approved leave does not count
+against an employee.
+
 ## Run Locally
 
 Create a Neon database, then copy `.env.example` to `.env` and replace `DATABASE_URL` with your Neon connection string.
