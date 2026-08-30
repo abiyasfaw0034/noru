@@ -23,7 +23,7 @@ This is the best fit for Neon at this stage: it avoids the operational overhead 
 - Login/logout with signed JWT cookie sessions
 - Dedicated department and role management screens
 - Employee CRUD
-- Employee search and filtering by name, code, email, department, role, and status
+- Employee search, filtering, and pagination by name, code, email, department, role, and status
 - Department and role assignment
 - Shift template creation, listing, and deletion
 - Employee shift assignment and unassignment
@@ -117,7 +117,7 @@ npm run db:studio    # Open Prisma Studio
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| GET | `/api/employees` | Accepts the same `q`, `departmentId`, `roleId`, and `status` filters as the UI |
+| GET | `/api/employees` | Same `q`, `departmentId`, `roleId`, `status` filters as the UI, plus `page` and `perPage` |
 | POST | `/api/employees` | 201 on success, 409 on duplicate code/email, 422 on a cross-tenant department or role |
 | GET | `/api/employees/{id}` | Includes the 10 most recent shift assignments and attendance records |
 | PATCH | `/api/employees/{id}` | Partial update; any subset of the create fields |

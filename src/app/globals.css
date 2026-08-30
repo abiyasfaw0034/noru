@@ -705,3 +705,22 @@ tbody tr:last-child td {
 .table-heading + .table-shell {
   margin-top: 10px;
 }
+
+.pager {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.pager [aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.pager-status {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}

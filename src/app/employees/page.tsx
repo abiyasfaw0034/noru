@@ -1,4 +1,4 @@
-import { Pencil, Search, Trash2, UserPlus, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil, Search, Trash2, UserPlus, X } from "lucide-react";
 import Link from "next/link";
 
 import { createEmployee, deleteEmployee } from "@/app/actions";
@@ -9,7 +9,14 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { employeeStatuses, statusLabels } from "@/lib/constants";
 import { formatDate } from "@/lib/dates";
 import { prisma } from "@/lib/db";
-import { buildEmployeeWhere, parseEmployeeFilters } from "@/lib/employee-filters";
+import {
+  buildEmployeeQuery,
+  buildEmployeeWhere,
+  employeePerPageOptions,
+  parseEmployeeFilters,
+  parseEmployeePagination,
+  resolvePage,
+} from "@/lib/employee-filters";
 import { getHotelContext } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
@@ -25,19 +32,29 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
     return <NoHotelState />;
   }
 
-  const filters = parseEmployeeFilters(await searchParams);
+  const params = await searchParams;
+  const filters = parseEmployeeFilters(params);
+  const requestedPage = parseEmployeePagination(params);
   const hasFilters = Boolean(
     filters.q || filters.departmentId || filters.roleId || filters.status,
   );
+  const where = buildEmployeeWhere(activeHotel.id, filters);
+
+  // The matching count is needed before the page can be clamped, so it is
+  // resolved first and the row query is paged against the settled offset.
+  const matchingCount = await prisma.employee.count({ where });
+  const page = resolvePage(requestedPage, matchingCount);
 
   const [employees, totalCount, departments, roles] = await Promise.all([
     prisma.employee.findMany({
-      where: buildEmployeeWhere(activeHotel.id, filters),
+      where,
       include: {
         department: true,
         role: true,
       },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+      skip: page.skip,
+      take: page.take,
     }),
     prisma.employee.count({
       where: {
@@ -126,6 +143,16 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
               ))}
             </select>
           </label>
+          <label>
+            Per page
+            <select defaultValue={String(page.perPage)} name="perPage">
+              {employeePerPageOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option} per page
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="form-actions">
             <SubmitButton>
               <Search aria-hidden size={16} />
@@ -153,9 +180,13 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
       </section>
 
       <h2 className="table-heading">
-        {hasFilters
-          ? `${employees.length} of ${totalCount} employees match`
-          : `${totalCount} employees`}
+        {matchingCount === 0
+          ? hasFilters
+            ? "No employees match"
+            : "No employees yet"
+          : `Showing ${page.from}-${page.to} of ${matchingCount}${
+              hasFilters ? ` matching (${totalCount} total)` : " employees"
+            }`}
       </h2>
       <section className="table-shell">
         <div className="table-scroll">
@@ -219,6 +250,42 @@ export default async function EmployeesPage({ searchParams }: EmployeesPageProps
           </table>
         </div>
       </section>
+
+      {page.totalPages > 1 ? (
+        <nav className="pager" aria-label="Employee list pages">
+          {page.page > 1 ? (
+            <Link
+              className="button"
+              href={buildEmployeeQuery(filters, { page: page.page - 1, perPage: page.perPage })}
+            >
+              <ChevronLeft aria-hidden size={16} />
+              Previous
+            </Link>
+          ) : (
+            <span className="button" aria-disabled="true">
+              <ChevronLeft aria-hidden size={16} />
+              Previous
+            </span>
+          )}
+          <span className="pager-status">
+            Page {page.page} of {page.totalPages}
+          </span>
+          {page.page < page.totalPages ? (
+            <Link
+              className="button"
+              href={buildEmployeeQuery(filters, { page: page.page + 1, perPage: page.perPage })}
+            >
+              Next
+              <ChevronRight aria-hidden size={16} />
+            </Link>
+          ) : (
+            <span className="button" aria-disabled="true">
+              Next
+              <ChevronRight aria-hidden size={16} />
+            </span>
+          )}
+        </nav>
+      ) : null}
     </>
   );
 }

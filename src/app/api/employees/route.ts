@@ -3,7 +3,12 @@ import { NextResponse } from "next/server";
 import { requireApiHotel, toErrorResponse } from "@/lib/api";
 import { parseDateInput } from "@/lib/dates";
 import { prisma } from "@/lib/db";
-import { buildEmployeeWhere, parseEmployeeFilters } from "@/lib/employee-filters";
+import {
+  buildEmployeeWhere,
+  parseEmployeeFilters,
+  parseEmployeePagination,
+  resolvePage,
+} from "@/lib/employee-filters";
 import { assertDepartmentBelongsToHotel, assertRoleBelongsToHotel } from "@/lib/guards";
 import { employeeFormSchema } from "@/lib/validation";
 
@@ -20,17 +25,31 @@ export async function GET(request: Request) {
 
   const params = Object.fromEntries(new URL(request.url).searchParams.entries());
   const filters = parseEmployeeFilters(params);
+  const where = buildEmployeeWhere(hotelId, filters);
+
+  const matchingCount = await prisma.employee.count({ where });
+  const page = resolvePage(parseEmployeePagination(params), matchingCount);
 
   const employees = await prisma.employee.findMany({
-    where: buildEmployeeWhere(hotelId, filters),
+    where,
     include: {
       department: true,
       role: true,
     },
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    skip: page.skip,
+    take: page.take,
   });
 
-  return NextResponse.json({ count: employees.length, filters, employees });
+  return NextResponse.json({
+    count: employees.length,
+    total: matchingCount,
+    page: page.page,
+    perPage: page.perPage,
+    totalPages: page.totalPages,
+    filters,
+    employees,
+  });
 }
 
 export async function POST(request: Request) {
